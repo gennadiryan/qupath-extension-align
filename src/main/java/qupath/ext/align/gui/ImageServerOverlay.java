@@ -8,24 +8,26 @@
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * QuPath is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License 
+ *
+ * You should have received a copy of the GNU General Public License
  * along with QuPath.  If not, see <https://www.gnu.org/licenses/>.
  * #L%
  */
 
 package qupath.ext.align.gui;
 
+import java.awt.AlphaComposite;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.image.BufferedImage;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,25 +44,27 @@ import qupath.lib.images.servers.ImageServer;
 import qupath.lib.regions.ImageRegion;
 
 /**
- * A {@link PathOverlay} implementation capable of painting one image on top of another, 
+ * A {@link PathOverlay} implementation capable of painting one image on top of another,
  * including an optional affine transformation.
- * 
+ *
  * @author Pete Bankhead
  */
 public class ImageServerOverlay extends AbstractOverlay {
-	
+
 	private static Logger logger = LoggerFactory.getLogger(ImageServerOverlay.class);
-	
+
+	private AlphaComposite composite = null;
+
 	private DefaultImageRegionStore store;
 	private ImageServer<BufferedImage> server;
-	
+
 	private ImageRenderer renderer;
-	
+
 	private Affine affine = new Affine();
-	
+
 	private AffineTransform transform;
 	private AffineTransform transformInverse;
-	
+
 	/**
 	 * Constructor.
 	 * @param viewer viewer to which the overlay should be added
@@ -69,7 +73,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	public ImageServerOverlay(final QuPathViewer viewer, final ImageServer<BufferedImage> server) {
 		this(viewer, server, new Affine());
 	}
-	
+
 	/**
 	 * Constructor.
 	 * @param viewer viewer to which the overlay should be added
@@ -89,8 +93,18 @@ public class ImageServerOverlay extends AbstractOverlay {
 			viewer.repaintEntireImage();
 		});
 		updateTransform();
+		this.setAlphaComposite((float) 1.0);
 	}
-	
+
+	@Override public AlphaComposite getAlphaComposite() {
+		return this.composite;
+	}
+
+	public void setAlphaComposite(float opacity) {
+		this.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity);
+	}
+
+
 	/**
 	 * Get the current renderer.
 	 * @return
@@ -98,7 +112,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	public ImageRenderer getRenderer() {
 		return renderer;
 	}
-	
+
 	/**
 	 * Set the rendered, which controls conversion of the image to RGB.
 	 * @param renderer
@@ -106,7 +120,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	public void setRenderer(ImageRenderer renderer) {
 		this.renderer = renderer;
 	}
-	
+
 	/**
 	 * Get the affine transform applied to the overlay image.
 	 * Making changes here will trigger repaints in the viewer.
@@ -115,7 +129,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	public Affine getAffine() {
 		return affine;
 	}
-	
+
 	private void updateTransform() {
 		transform.setTransform(
 			affine.getMxx(),
@@ -136,7 +150,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	public void paintOverlay(Graphics2D g2d, ImageRegion imageRegion, double downsampleFactor, ImageData<BufferedImage> imageData, boolean paintCompletely) {
 
 		BufferedImage imgThumbnail = null;//store.getThumbnail(server, imageRegion.getZ(), imageRegion.getT(), true);
-			
+
 		// Paint the image
 		Graphics2D gCopy = (Graphics2D)g2d.create();
 		if (transformInverse != null) {
@@ -146,7 +160,8 @@ public class ImageServerOverlay extends AbstractOverlay {
 		} else {
 			logger.debug("Inverse affine transform is null!");
 		}
-		var composite = getAlphaComposite();
+		var composite = this.getAlphaComposite();
+		// var composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) 0.5);
 		if (composite != null)
 			gCopy.setComposite(composite);
 		if (PathPrefs.viewerInterpolateBilinearProperty().get())
@@ -156,7 +171,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 
 		store.paintRegion(server, gCopy, gCopy.getClip(), imageRegion.getZ(), imageRegion.getT(), downsampleFactor, imgThumbnail, null, renderer);
 		gCopy.dispose();
-				
+
 	}
-	
+
 }
