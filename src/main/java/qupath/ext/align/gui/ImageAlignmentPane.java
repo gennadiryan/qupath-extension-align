@@ -139,8 +139,8 @@ public class ImageAlignmentPane {
 
 	private ObservableList<ImageData<BufferedImage>> images = FXCollections.observableArrayList();
 	private ObjectProperty<ImageData<BufferedImage>> selectedImageData = new SimpleObjectProperty<>();
-	private DoubleProperty rotationIncrement = new SimpleDoubleProperty(1.0);
-	private FloatProperty overlayOpacity = new SimpleFloatProperty((float) 1.0);
+	private DoubleProperty rotationIncrement = new SimpleDoubleProperty((double) 1.0);
+	private FloatProperty overlayOpacityProperty = new SimpleFloatProperty((float) 1.0);
 
 	private StringProperty affineStringProperty;
 
@@ -231,39 +231,32 @@ public class ImageAlignmentPane {
 		Label labelOpacity = new Label("Opacity");
 		labelOpacity.setLabelFor(sliderOpacity);
 
-		Slider sliderOverlayOpacity = new Slider(0, 1, this.overlayOpacity.get());
-		sliderOverlayOpacity.valueProperty().bindBidirectional(this.overlayOpacity);
+		// Overlay opacity slider
+		Slider sliderOverlayOpacity = new Slider(0, 1, this.overlayOpacityProperty.get());
+		sliderOverlayOpacity.valueProperty().bindBidirectional(this.overlayOpacityProperty);
 		sliderOverlayOpacity.setMaxWidth(Double.MAX_VALUE);
 		Label labelOverlayOpacity = new Label("Overlay opacity");
 		labelOverlayOpacity.setLabelFor(sliderOverlayOpacity);
-		Button buttonSetOverlayOpacity = new Button("Set overlay opacity");
-		buttonSetOverlayOpacity.setOnAction(e -> {
-			ImageServerOverlay overlay = this.getSelectedOverlay();
-			if (overlay != null) {
-				overlay.setAlphaComposite((float) this.overlayOpacity.get());
-			}
-		});
 
 		GridPane paneList = new GridPane();
 		paneList.add(listImages, 0, 0, 2, 1);
 		paneList.add(btnChooseImages, 0, 1, 2, 1);
 		paneList.add(labelOpacity, 0, 2);
 		paneList.add(sliderOpacity, 1, 2);
-		paneList.add(labelOverlayOpacity, 0, 3);
-		paneList.add(sliderOverlayOpacity, 1, 3);
-		paneList.add(buttonSetOverlayOpacity, 0, 4, 2, 1);
+		paneList.add(labelOverlayOpacity, 0, 3); //
+		paneList.add(sliderOverlayOpacity, 1, 3); //
 		paneList.setVgap(5);
 		paneList.setMaxWidth(Double.MAX_VALUE);
 		GridPane.setFillHeight(listImages, Boolean.TRUE);
 		GridPane.setFillWidth(listImages, Boolean.TRUE);
 		GridPane.setFillWidth(btnChooseImages, Boolean.TRUE);
 		GridPane.setFillWidth(sliderOpacity, Boolean.TRUE);
-		GridPane.setFillWidth(sliderOverlayOpacity, Boolean.TRUE);
-		GridPane.setFillWidth(buttonSetOverlayOpacity, Boolean.TRUE);
+		GridPane.setFillWidth(sliderOverlayOpacity, Boolean.TRUE); //
+		GridPane.setVgrow(listImages, Priority.ALWAYS);
 		GridPane.setHgrow(listImages, Priority.ALWAYS);
 		GridPane.setHgrow(btnChooseImages, Priority.ALWAYS);
 		GridPane.setHgrow(sliderOpacity, Priority.ALWAYS);
-		GridPane.setVgrow(listImages, Priority.ALWAYS);
+		GridPane.setHgrow(sliderOverlayOpacity, Priority.ALWAYS); //
 
 		// Create center pane for alignment
 
@@ -616,7 +609,7 @@ public class ImageAlignmentPane {
 				logger.error("Unable to read ImageData for " + temp.getImageName(), e);
 				continue;
 			}
-			ImageServerOverlay overlay = new ImageServerOverlay(viewer, imageData.getServer());
+			ImageServerOverlay overlay = new ImageServerOverlay(viewer, imageData, this.overlayOpacityProperty);
 			//@phaub Support of viewer display settings
 			overlay.setRenderer(renderer);
 
@@ -631,7 +624,7 @@ public class ImageAlignmentPane {
 
 
 	void addImageData(final ImageData<BufferedImage> imageData) {
-		ImageServerOverlay overlay = new ImageServerOverlay(viewer, imageData.getServer());
+		ImageServerOverlay overlay = new ImageServerOverlay(viewer, imageData, this.overlayOpacityProperty);
 		mapOverlays.put(imageData, overlay);
 		viewer.getCustomOverlayLayers().add(overlay);
 		images.add(0, imageData);

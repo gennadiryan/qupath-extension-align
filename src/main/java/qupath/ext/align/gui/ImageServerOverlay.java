@@ -43,6 +43,11 @@ import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.regions.ImageRegion;
 
+import javafx.beans.property.FloatProperty;
+import qupath.lib.gui.viewer.OverlayOptions;
+import qupath.lib.gui.viewer.PathHierarchyPaintingHelper;
+import qupath.lib.objects.hierarchy.PathObjectHierarchy;
+
 /**
  * A {@link PathOverlay} implementation capable of painting one image on top of another,
  * including an optional affine transformation.
@@ -53,17 +58,30 @@ public class ImageServerOverlay extends AbstractOverlay {
 
 	private static Logger logger = LoggerFactory.getLogger(ImageServerOverlay.class);
 
-	private AlphaComposite composite = null;
-
 	private DefaultImageRegionStore store;
 	private ImageServer<BufferedImage> server;
-
+	private PathObjectHierarchy hierarchy;
 	private ImageRenderer renderer;
+
+	private FloatProperty overlayOpacityProperty = null;
 
 	private Affine affine = new Affine();
 
 	private AffineTransform transform;
 	private AffineTransform transformInverse;
+
+
+	public ImageServerOverlay(final QuPathViewer viewer, final ImageData<BufferedImage> imageData, final FloatProperty overlayOpacityProperty) {
+		this(viewer, imageData);
+		this.overlayOpacityProperty = overlayOpacityProperty;
+	}
+
+
+	public ImageServerOverlay(final QuPathViewer viewer, final ImageData<BufferedImage> imageData) {
+		this(viewer, imageData.getServer());
+		this.hierarchy = imageData.getHierarchy();
+	}
+
 
 	/**
 	 * Constructor.
@@ -93,15 +111,10 @@ public class ImageServerOverlay extends AbstractOverlay {
 			viewer.repaintEntireImage();
 		});
 		updateTransform();
-		this.setAlphaComposite((float) 1.0);
 	}
 
 	@Override public AlphaComposite getAlphaComposite() {
-		return this.composite;
-	}
-
-	public void setAlphaComposite(float opacity) {
-		this.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity);
+		return AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) (this.overlayOpacityProperty == null ? 1.0 : this.overlayOpacityProperty.get()));
 	}
 
 
@@ -114,7 +127,7 @@ public class ImageServerOverlay extends AbstractOverlay {
 	}
 
 	/**
-	 * Set the rendered, which controls conversion of the image to RGB.
+	 * Set the renderer, which controls conversion of the image to RGB.
 	 * @param renderer
 	 */
 	public void setRenderer(ImageRenderer renderer) {
@@ -148,9 +161,6 @@ public class ImageServerOverlay extends AbstractOverlay {
 
 	@Override
 	public void paintOverlay(Graphics2D g2d, ImageRegion imageRegion, double downsampleFactor, ImageData<BufferedImage> imageData, boolean paintCompletely) {
-
-		BufferedImage imgThumbnail = null;//store.getThumbnail(server, imageRegion.getZ(), imageRegion.getT(), true);
-
 		// Paint the image
 		Graphics2D gCopy = (Graphics2D)g2d.create();
 		if (transformInverse != null) {
@@ -160,16 +170,25 @@ public class ImageServerOverlay extends AbstractOverlay {
 		} else {
 			logger.debug("Inverse affine transform is null!");
 		}
-		var composite = this.getAlphaComposite();
-		// var composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) 0.5);
-		if (composite != null)
-			gCopy.setComposite(composite);
+
+		gCopy.setComposite(this.getAlphaComposite());
+
 		if (PathPrefs.viewerInterpolateBilinearProperty().get())
 			gCopy.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 		else
 			gCopy.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
-		store.paintRegion(server, gCopy, gCopy.getClip(), imageRegion.getZ(), imageRegion.getT(), downsampleFactor, imgThumbnail, null, renderer);
+		store.paintRegion(server, gCopy, gCopy.getClip(), imageRegion.getZ(), imageRegion.getT(), downsampleFactor, null, null, renderer);
+
+		if (this.hierarchy != null) {
+			for (var annotation: this.hierarchy.getAnnotationObjects()) {
+				var roi = annotation.getROI();
+				if (imageRegion.intersects(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight())) {
+					PathHierarchyPaintingHelper.paintObject(annotation, false, gCopy, gCopy.getClipBounds(), new OverlayOptions(), this.hierarchy.getSelectionModel(), downsampleFactor);
+				}
+			}
+		}
+
 		gCopy.dispose();
 
 	}
